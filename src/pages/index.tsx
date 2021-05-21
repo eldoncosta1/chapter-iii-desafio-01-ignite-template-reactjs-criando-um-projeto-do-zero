@@ -38,7 +38,28 @@ export default function Home({ postsPagination }: HomeProps) {
 
   useEffect(() => {
     if (postsPagination.results.length) {
-      setPages([postsPagination]);
+      setPages([
+        {
+          next_page: postsPagination.next_page,
+          results: postsPagination.results.map((post: Post) => {
+            return {
+              uid: post.uid,
+              data: {
+                title: post.data.title,
+                subtitle: post.data.subtitle,
+                author: post.data.author,
+              },
+              first_publication_date: format(
+                new Date(post.first_publication_date),
+                'dd MMM yyyy',
+                {
+                  locale: ptBR,
+                }
+              ),
+            };
+          }),
+        },
+      ]);
       setNextPage(postsPagination.next_page);
     }
   }, [postsPagination]);
@@ -61,7 +82,7 @@ export default function Home({ postsPagination }: HomeProps) {
                 },
                 first_publication_date: format(
                   new Date(post.first_publication_date),
-                  'dd MMMM yyyy',
+                  'dd MMM yyyy',
                   {
                     locale: ptBR,
                   }
@@ -117,9 +138,7 @@ export const getStaticProps: GetStaticProps = async () => {
     }
   );
 
-  // console.log(JSON.stringify(postsResponse, null, 2));
-
-  const results = postsResponse.results.map((post: Post) => {
+  const results = postsResponse.results.map(post => {
     return {
       uid: post.uid,
       data: {
@@ -127,16 +146,9 @@ export const getStaticProps: GetStaticProps = async () => {
         subtitle: post.data.subtitle,
         author: post.data.author,
       },
-      first_publication_date: format(
-        new Date(post.first_publication_date),
-        'dd MMMM yyyy',
-        {
-          locale: ptBR,
-        }
-      ),
+      first_publication_date: post.first_publication_date,
     };
   });
-  // console.log(JSON.stringify(postsPagination, null, 2));
 
   return {
     props: {

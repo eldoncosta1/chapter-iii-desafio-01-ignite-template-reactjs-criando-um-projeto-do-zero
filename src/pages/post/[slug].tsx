@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { GetStaticPaths, GetStaticProps } from 'next';
 import { format } from 'date-fns';
@@ -16,8 +17,10 @@ import styles from './post.module.scss';
 
 interface Post {
   first_publication_date: string | null;
+  uid: string;
   data: {
     title: string;
+    subtitle: string;
     banner: {
       url: string;
     };
@@ -33,14 +36,44 @@ interface Post {
 
 interface PostProps {
   post: Post;
-  time_to_read: string;
 }
 
-export default function Post({ post, time_to_read }: PostProps) {
+export default function Post({ post }: PostProps) {
   const { isFallback } = useRouter();
 
   if (isFallback) {
-    return <div>Carregando..</div>;
+    return <div>Carregando...</div>;
+  }
+
+  function getTimeToWorld() {
+    const count_worlds = post.data.content.reduce(
+      (acc, item_post) => {
+        let heading = [];
+        let body = [];
+        if (item_post.heading) {
+          heading = item_post.heading.split(' ');
+        }
+        if (item_post.body) {
+          const removeSpecialCharacters = RichText.asText(item_post?.body)
+            .toString()
+            .replace(/[^a-zA-Z0-9 ]/g, '');
+          body = removeSpecialCharacters.split(' ');
+        }
+        acc.heading += heading.length;
+        acc.body += body.length;
+
+        return acc;
+      },
+      {
+        heading: 0,
+        body: 0,
+      }
+    );
+    return `${Math.ceil((count_worlds.heading + count_worlds.body) / 200)} min`;
+  }
+
+  function getFormatedDate(date_timestamp) {
+    return format(new Date(date_timestamp), 'dd MMM yyyy', { locale: ptBR });
   }
 
   return (
@@ -57,13 +90,14 @@ export default function Post({ post, time_to_read }: PostProps) {
           <p className={commonStyles.subtitle} />
           <div>
             <time>
-              <FiCalendar size={20} /> {post.first_publication_date}
+              <FiCalendar size={20} />
+              {getFormatedDate(post.first_publication_date)}
             </time>
             <span>
               <FiUser size={20} /> {post.data.author}
             </span>
             <span>
-              <FiClock size={20} /> {time_to_read} min
+              <FiClock size={20} /> {getTimeToWorld()}
             </span>
           </div>
         </div>
@@ -78,7 +112,7 @@ export default function Post({ post, time_to_read }: PostProps) {
             <div
               className={styles.containerBody}
               dangerouslySetInnerHTML={{
-                __html: paragraph.body.toString(),
+                __html: RichText.asHtml(paragraph.body),
               }}
             />
           </div>
@@ -104,8 +138,6 @@ export const getStaticPaths: GetStaticPaths = async () => {
     },
   }));
 
-  // console.log(JSON.stringify(posts, null, 2));
-
   return {
     paths: slugs,
     fallback: true,
@@ -119,10 +151,10 @@ export const getStaticProps: GetStaticProps = async ({ params }) => {
 
   const response = await prismic.getByUID('posts', String(slug), {});
 
-  // console.log(response);
   const post = {
     data: {
       title: response.data.title,
+      subtitle: response.data.subtitle,
       banner: {
         url: response.data.banner.url,
       },
@@ -130,48 +162,17 @@ export const getStaticProps: GetStaticProps = async ({ params }) => {
       content: response.data.content.map(item => {
         return {
           heading: item.heading,
-          body: RichText.asHtml(item.body),
+          body: item.body,
         };
       }),
     },
-    first_publication_date: format(
-      new Date(response.first_publication_date),
-      'dd MMMM yyyy',
-      {
-        locale: ptBR,
-      }
-    ),
+    first_publication_date: response.first_publication_date,
+    uid: response.uid,
   };
-
-  const count_worlds = response.data.content.reduce(
-    (acc, item_post) => {
-      let heading = [];
-      let body = [];
-      if (item_post.heading) {
-        heading = item_post.heading.split(' ');
-      }
-      if (item_post.body) {
-        body = RichText.asText(item_post?.body).split(' ');
-      }
-      acc.heading += heading.length;
-      acc.body += body.length;
-
-      return acc;
-    },
-    {
-      heading: 0,
-      body: 0,
-    }
-  );
-
-  const time_to_read = Math.ceil(
-    (count_worlds.heading + count_worlds.body) / 200
-  );
 
   return {
     props: {
       post,
-      time_to_read,
     },
     revalidate: 60 * 30, // 30 minutes
   };
